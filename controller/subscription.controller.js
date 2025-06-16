@@ -73,7 +73,6 @@ async function createBigCommercePayment(subscription) {
     const fetch = (await import('node-fetch')).default;
     
     console.log("🚀 Starting BigCommerce payment flow");
-    console.log("📋 Subscription data:", JSON.stringify(subscription, null, 2));
 
     // Helper function to safely parse JSON responses
     async function safeJsonParse(response) {
@@ -124,7 +123,7 @@ console.log("ashishs order details",orderDetails)
     // Step 1: Get product details using SKU
     console.log("📦 Step 1: Fetching product details");
     const productData = await makeApiCall(
-      `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?sku=${subscription.productId}`,
+      `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${subscription.productId}`,
       {
         method: 'GET',
         headers: {
@@ -137,12 +136,12 @@ console.log("ashishs order details",orderDetails)
     );
 
     if (!productData.data || productData.data.length === 0) {
-      throw new Error(`❌ Product not found with SKU: ${subscription.productId}`);
+      throw new Error(`❌ Product not found with SKU: ${subscription.skuId}`);
     }
-
-    const product = productData.data[0];
+console.log("product data",productData)
+    const product = productData.data;
     const productId = product.id;
-    console.log(`✅ Product found: ID ${productId}, Name: ${product.name}`);
+    console.log(`✅ Product found: ID ${productId}, Name: ${product}`);
 
     // Step 2: Get product variants
     console.log("🔍 Step 2: Fetching product variants");
@@ -228,40 +227,42 @@ console.log("ashishs order details",orderDetails)
       }
     }
 
-
-
+    
     // Step 4: Create order with status_id:0 (Incomplete)
     console.log("📝 Step 4: Creating order");
+    let subData=JSON.stringify(subscription, null, 2);
+    let subDataParsed=JSON.parse(subData);
+
     
     const orderPayload = {
       status_id: 0, // Important: Must be 0 for payment processing
       customer_id: customerId,
       billing_address: {
-        first_name: subscription.billingAddress.firstName || orderDetails.billing_address.first_name || "John",
-        last_name: subscription.billingAddress.lastName || orderDetails.billing_address.last_name || "Doe",
-        street_1: subscription.billingAddress.street1 || orderDetails.billing_address.street_1 || "123 Test St",
-        street_2: subscription.billingAddress.street2 || orderDetails.billing_address.street_2 || "",
-        city: subscription.billingAddress.city || orderDetails.billing_address.city || "Testville",
-        state: subscription.billingAddress.state || orderDetails.billing_address.state || "California",
-        zip: subscription.billingAddress.zip || orderDetails.billing_address.zip || "12345",
-        country: subscription.billingAddress.country || orderDetails.billing_address.country || "United States",
-        country_iso2: subscription.billingAddress.countryIso2 || orderDetails.billing_address.country_iso2 || "US",
-        email: subscription.billingAddress.email || orderDetails.billing_address.email || "test@example.com",
-        phone: subscription.billingAddress.phone || orderDetails.billing_address.phone || "1234567890"
+        first_name: subDataParsed.billingAddress.firstName || orderDetails.billing_address.first_name || "John",
+        last_name: subDataParsed.billingAddress.lastName || orderDetails.billing_address.last_name || "Doe",
+        street_1: subDataParsed.billingAddress.street1 || orderDetails.billing_address.street_1 || "123 Test St",
+        street_2: subDataParsed.billingAddress.street2 || orderDetails.billing_address.street_2 || "",
+        city: subDataParsed.billingAddress.city || orderDetails.billing_address.city || "Testville",
+        state: subDataParsed.billingAddress.state || orderDetails.billing_address.state || "California",
+        zip: subDataParsed.billingAddress.zip || orderDetails.billing_address.zip || "12345",
+        country: subDataParsed.billingAddress.country || orderDetails.billing_address.country || "United States",
+        country_iso2: subDataParsed.billingAddress.countryIso2 || orderDetails.billing_address.country_iso2 || "US",
+        email: subDataParsed.billingAddress.email || orderDetails.billing_address.email || "test@example.com",
+        phone: subDataParsed.billingAddress.phone || orderDetails.billing_address.phone || "1234567890"
       },
       shipping_addresses: [
         {
-          first_name: subscription.shippingAddress.firstName || orderDetails.billing_address.first_name || "John",
-          last_name: subscription.shippingAddress.lastName || orderDetails.billing_address.last_name || "Doe",
-          street_1: subscription.shippingAddress.street1 || orderDetails.billing_address.street_1 || "123 Test St",
-          street_2: subscription.shippingAddress.street2 || orderDetails.billing_address.street_2 || "",
-          city: subscription.shippingAddress.city || orderDetails.billing_address.city || "Testville",
-          state: subscription.shippingAddress.state || orderDetails.billing_address.state || "California",
-          zip: subscription.shippingAddress.zip || orderDetails.billing_address.zip || "12345",
-          country: subscription.shippingAddress.country || orderDetails.billing_address.country || "United States",
-          country_iso2: subscription.shippingAddress.countryIso2 || orderDetails.billing_address.country_iso2 || "US",
-          email: subscription.shippingAddress.email || orderDetails.billing_address.email || "test@example.com",
-          phone: subscription.shippingAddress.phone || orderDetails.billing_address.phone || "1234567890"
+          first_name: subDataParsed.billingAddress.firstName || orderDetails.billing_address.first_name || "John",
+          last_name: subDataParsed.billingAddress.lastName || orderDetails.billing_address.last_name || "Doe",
+          street_1: subDataParsed.billingAddress.street1 || orderDetails.billing_address.street_1 || "123 Test St",
+          street_2: subDataParsed.billingAddress.street2 || orderDetails.billing_address.street_2 || "",
+          city: subDataParsed.billingAddress.city || orderDetails.billing_address.city || "Testville",
+          state: subDataParsed.billingAddress.state || orderDetails.billing_address.state || "California",
+          zip: subDataParsed.billingAddress.zip || orderDetails.billing_address.zip || "12345",
+          country: subDataParsed.billingAddress.country || orderDetails.billing_address.country || "United States",
+          country_iso2: subDataParsed.billingAddress.countryIso2 || orderDetails.billing_address.country_iso2 || "US",
+          email: subDataParsed.billingAddress.email || orderDetails.billing_address.email || "test@example.com",
+          phone: subDataParsed.billingAddress.phone || orderDetails.billing_address.phone || "1234567890"
         }
       ],
       products: [
@@ -436,6 +437,37 @@ const productBySku=async(req,res)=>{
 
 const storeOrderData=async(req,res)=>{
     try {
+        // console.log("=== RECEIVED SESSION STORAGE DATA ===");
+        // console.log("Order ID:", req.body.orderId);
+        // console.log("Timestamp:", req.body.timestamp);
+        // console.log("Total sessionStorage items:", req.body.sessionStorageData ? req.body.sessionStorageData.length : 0);
+        
+        // Log complete request body with proper JSON formatting
+        // console.log("\n📦 COMPLETE REQUEST BODY:");
+        // console.log(JSON.stringify(req.body, null, 2));
+        
+        // Log all sessionStorage data with detailed formatting
+        // if (req.body.sessionStorageData && req.body.sessionStorageData.length > 0) {
+        //     console.log("\n📦 DETAILED SESSION STORAGE DATA:");
+        //     req.body.sessionStorageData.forEach((item, index) => {
+        //         console.log(`\n=== ITEM ${index + 1} ===`);
+        //         console.log(`Key: ${item.key}`);
+        //         console.log(`Value Type: ${typeof item.value}`);
+        //         console.log(`Value Content:`);
+        //         console.log(JSON.stringify(item.value, null, 2));
+                
+        //         // If it's a dropdown item, extract specific fields
+        //         if (item.key.startsWith('dropdown_') && item.value) {
+        //             console.log(`\n🎯 DROPDOWN DETAILS:`);
+        //             console.log(`  Product Name: ${item.value.productName || 'N/A'}`);
+        //             console.log(`  SKU: ${item.value.sku || 'N/A'}`);
+        //             console.log(`  Price: ${item.value.price || 'N/A'}`);
+        //             console.log(`  Selected Option: ${JSON.stringify(item.value.selectedOption, null, 2)}`);
+        //         }
+        //         console.log(`==================`);
+        //     });
+        // }
+
         const fetch = (await import('node-fetch')).default;
         const url = `https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${req.body.orderId}`;
         
@@ -450,58 +482,192 @@ const storeOrderData=async(req,res)=>{
 
         const response = await fetch(url, options);
         const orderData = await response.json();
-        console.log("orderData",orderData)
-        // Extract subscription days from selectedOption
-        const subscriptionDays = parseInt(req.body?.dropdownData?.selectedOption?.label?.match(/\d+/)[0]);
+        // console.log("BigCommerce Order Data:", JSON.stringify(orderData, null, 2));
 
-        // Create subscription
-        const subscription = new Subscription({
-            orderId: req.body.orderId,
-            userId: orderData.customer_id,
-            email: orderData.billing_address.email,
-            productId: req.body.dropdownData.sku,
-            productName: req.body.dropdownData.productName,
-            subscriptionDays: subscriptionDays,
-            startDate: new Date(),
-            nextShipmentDate: new Date(new Date().setDate(new Date().getDate() + subscriptionDays)),
-            status: 'active',
-            paymentStatus: 'pending',
-            paymentMethod: orderData?.payment_method || 'Manual',
-            billingAddress: {
-                firstName: orderData?.billing_address?.first_name,
-                lastName: orderData?.billing_address?.last_name,
-                email: orderData?.billing_address?.email,
-                phone: orderData?.billing_address?.phone,
-                street1: orderData?.billing_address?.street_1,
-                street2: orderData?.billing_address?.street_2,
-                city: orderData?.billing_address?.city,
-                state: orderData?.billing_address?.state,
-                zip: orderData?.billing_address?.zip,
-                country: orderData?.billing_address?.country,
-                countryIso2: orderData?.billing_address?.country_iso2
-            },
-            shippingAddress: {
-                firstName: orderData?.orderData?.billing_address?.first_name,
-                lastName: orderData?.orderData?.billing_address?.last_name,
-                email: orderData?.orderData?.billing_address?.email,
-                phone: orderData?.orderData?.billing_address?.phone,
-                street1: orderData?.orderData?.billing_address?.street_1,
-                street2: orderData?.orderData?.billing_address?.street_2,
-                city: orderData?.orderData?.billing_address?.city,
-                state: orderData?.orderData?.billing_address?.state,
-                zip: orderData?.orderData?.billing_address?.zip,
-                country: orderData?.orderData?.billing_address?.country,
-                countryIso2: orderData?.orderData?.billing_address?.country_iso2
+        async function safeJsonParse(response) {
+          const text = await response.text();
+          try {
+            return JSON.parse(text);
+          } catch (e) {
+            console.error("❌ Failed to parse JSON response:", text);
+            throw new Error(`Invalid JSON response: ${text}`);
+          }
+        }
+    
+        // Helper function to make API calls with proper error handling
+        async function makeApiCall(url, options, description) {
+          console.log(`🔄 ${description}...`);
+          console.log(`📡 URL: ${url}`);
+          
+          const response = await fetch(url, options);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ ${description} failed:`, errorText);
+            throw new Error(`${description} failed: ${response.status} ${response.statusText} - ${errorText}`);
+          }
+          
+          const data = await safeJsonParse(response);
+          console.log(`✅ ${description} successful`);
+          return data;
+        }
+
+
+        // Process dropdown data if exists
+        const dropdownItems = req.body.sessionStorageData ? 
+            req.body.sessionStorageData.filter(item => item.key.startsWith('dropdown_')) : [];
+        
+        if (dropdownItems.length === 0) {
+            return res.json({
+                success: false,
+                message: "No dropdown data found in sessionStorage",
+                data: { orderId: req.body.orderId }
+            });
+        }
+
+        // console.log(`\n🎯 Found ${dropdownItems.length} dropdown items to process`);
+        
+        const createdSubscriptions = [];
+        
+        // Process each dropdown item
+        for (let i = 0; i < dropdownItems.length; i++) {
+            const dropdownItem = dropdownItems[i];
+            const dropdownData = dropdownItem.value;
+            
+            // console.log(`\n📦 Processing Item ${i + 1}: ${dropdownItem.key}`);
+            // console.log(`Product: ${dropdownData.productName}`);
+            // console.log(`SKU: ${dropdownData.sku}`);
+            
+            if (!dropdownData.selectedOption || !dropdownData.selectedOption.label) {
+                console.log(`⚠️ Skipping ${dropdownItem.key} - No selectedOption found`);
+                continue;
             }
-        });
+            
+            const subscriptionDays = parseInt(dropdownData.selectedOption.label.match(/\d+/)?.[0]);
+            
+            if (!subscriptionDays) {
+                console.log(`⚠️ Skipping ${dropdownItem.key} - Could not extract subscription days`);
+                continue;
+            }
+            
+            console.log(`✅ Subscription days: ${subscriptionDays}`);
+            
+            try {
+                // Get product details
+                console.log(`🔍 Fetching product details for SKU: ${dropdownData.sku}`);
+                const productData = await makeApiCall(
+                    `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products?sku=${dropdownData.sku}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'X-Auth-Token': accessToken,
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        }
+                    },
+                    `Product fetch for ${dropdownData.sku}`
+                );
+                
+                if (!productData.data || productData.data.length === 0) {
+                    console.log(`❌ Product not found with SKU: ${dropdownData.sku}`);
+                    continue;
+                }
+                
+                const product = productData.data[0];
+                const productId = product.id;
+                console.log(`✅ Product found: ID ${productId}, Name: ${product}`);
+                
+                // Get product variants
+                console.log(`🔍 Fetching variants for product: ${productId}`);
+                const variantsData = await makeApiCall(
+                    `https://api.bigcommerce.com/stores/${storeHash}/v3/catalog/products/${productId}/variants`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'X-Auth-Token': accessToken,
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                        }
+                    },
+                    `Variants fetch for product ${productId}`
+                );
+                
+                if (!variantsData.data || variantsData.data.length === 0) {
+                    console.log(`❌ No variants found for product: ${productId}`);
+                    continue;
+                }
+                
+                const variant = variantsData.data[0];
+                console.log(`✅ Variant found: ID ${variant.id}, Price: ${variant}`);
+                
+                // Create subscription
+                // console.log(`📝 Creating subscription for ${dropdownData.productName}`);
+                const subscription = new Subscription({
+                    orderId: req.body.orderId,
+                    userId: orderData.customer_id,
+                    email: orderData.billing_address.email,
+                    productId: variant.product_id,
+                    skuId: variant.sku_id || variant.sku,
+                    quantity: 1, 
+                    digital: orderData.order_is_digital || false,
+                    productName: dropdownData.productName,
+                    subscriptionDays: subscriptionDays,
+                    startDate: new Date(),
+                    nextShipmentDate: new Date(new Date().setDate(new Date().getDate() + subscriptionDays)),
+                    status: 'active',
+                    paymentStatus: 'pending',
+                    paymentMethod: orderData?.payment_method || 'Manual',
+                    billingAddress: {
+                        firstName: orderData?.billing_address?.first_name,
+                        lastName: orderData?.billing_address?.last_name,
+                        email: orderData?.billing_address?.email,
+                        phone: orderData?.billing_address?.phone,
+                        street1: orderData?.billing_address?.street_1,
+                        street2: orderData?.billing_address?.street_2,
+                        city: orderData?.billing_address?.city,
+                        state: orderData?.billing_address?.state,
+                        zip: orderData?.billing_address?.zip,
+                        country: orderData?.billing_address?.country,
+                        countryIso2: orderData?.billing_address?.country_iso2
+                    },
+                    shippingAddress: {
+                        firstName: orderData?.billing_address?.first_name,
+                        lastName: orderData?.billing_address?.last_name,
+                        email: orderData?.billing_address?.email,
+                        phone: orderData?.billing_address?.phone,
+                        street1: orderData?.billing_address?.street_1,
+                        street2: orderData?.billing_address?.street_2,
+                        city: orderData?.billing_address?.city,
+                        state: orderData?.billing_address?.state,
+                        zip: orderData?.billing_address?.zip,
+                        country: orderData?.billing_address?.country,
+                        countryIso2: orderData?.billing_address?.country_iso2
+                    }
+                });
 
-        await subscription.save();
+                await subscription.save();
+                createdSubscriptions.push(subscription);
+                console.log(`✅ Subscription created successfully for ${dropdownData.productName}`);
+                
+            } catch (error) {
+                console.error(`❌ Error processing ${dropdownItem.key}:`, error.message);
+                continue;
+            }
+        }
 
         return res.json({
-            message: "Order and subscription data stored successfully",
+            success: true,
+            message: `Successfully processed ${createdSubscriptions.length} subscriptions`,
             data: {
-                order: orderData,
-                subscription: subscription
+                orderId: req.body.orderId,
+                totalDropdownItems: dropdownItems.length,
+                createdSubscriptions: createdSubscriptions.length,
+                subscriptions: createdSubscriptions.map(sub => ({
+                    id: sub._id,
+                    productName: sub.productName,
+                    subscriptionDays: sub.subscriptionDays,
+                    nextShipmentDate: sub.nextShipmentDate
+                }))
             }
         });
     } catch (err) {
@@ -540,7 +706,6 @@ cron.schedule('* * * * *', async () => {
         console.log(`Checking ${subscriptions.length} subscriptions at ${new Date().toLocaleTimeString()}`);
 
         for (const subscription of subscriptions) {
-          console.log("ashish subscription days",subscription)
 
             const daysUntilShipment = Math.ceil((subscription.nextShipmentDate - today) / (1000 * 60 * 60 * 24));
             if (daysUntilShipment <= 4 ) {
@@ -861,8 +1026,317 @@ async function processAsCashOnDelivery(orderId) {
   }
 }
 
+// Dashboard summary API
+const getDashboardSummary = async (req, res) => {
+  try {
+    const totalSubscriptions = await Subscription.countDocuments();
+    const totalSubscribers = await Subscription.distinct('email').then(arr => arr.length);
+    const totalCustomers = await Subscription.distinct('email').then(arr => arr.length);
+    const totalProducts = await Subscription.distinct('productId').then(arr => arr.length);
+    const totalRatePlans = await Subscription.distinct('subscriptionDays').then(arr => arr.length);
+
+    // Billing Operations
+    const paidSubs = await Subscription.find({ paymentStatus: 'completed' });
+    const paidCount = paidSubs.length;
+    const paidAmount = paidSubs.reduce((sum, sub) => {
+      if (Array.isArray(sub.paymentHistory)) {
+        return sum + sub.paymentHistory
+          .filter(p => p.status === 'completed')
+          .reduce((s, p) => s + (p.amount || 0), 0);
+      }
+      return sum;
+    }, 0);
+
+    const processingCount = await Subscription.countDocuments({ paymentStatus: 'processing' });
+    const postedCount = await Subscription.countDocuments({ paymentStatus: 'posted' });
+    const refundCount = await Subscription.countDocuments({ paymentStatus: 'refund' });
+    const overdueSubs = await Subscription.find({ paymentStatus: 'overdue' });
+    const overdueCount = overdueSubs.length;
+    const overdueAmount = overdueSubs.reduce((sum, sub) => {
+      if (Array.isArray(sub.paymentHistory)) {
+        return sum + sub.paymentHistory
+          .filter(p => p.status === 'overdue')
+          .reduce((s, p) => s + (p.amount || 0), 0);
+      }
+      return sum;
+    }, 0);
+console.log("totalCustomers",totalCustomers)
+    res.json({
+      subscriptions: totalSubscriptions,
+      subscribers: totalSubscribers,
+      customers: totalCustomers,
+      products: totalProducts,
+      ratePlans: totalRatePlans,
+      billing: {
+        paid: { count: paidCount, amount: paidAmount },
+        processing: processingCount,
+        posted: postedCount,
+        refund: refundCount,
+        overdue: { count: overdueCount, amount: overdueAmount }
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// API for Subscription Dashboard Data
+const getSubscriptionDashboardData = async (req, res) => {
+  try {
+    // Total Subscribers (unique emails)
+    const totalSubscribers = await Subscription.distinct('email').then(arr => arr.length);
+
+    // Active Plans (unique productName with active status)
+    const activePlans = await Subscription.find({ status: 'active' }).distinct('productName');
+
+    // Avg. Subscription (average of subscriptionDays in months)
+    const avgSubscriptionDays = await Subscription.aggregate([
+      { $match: { status: 'active' } },
+      { $group: { _id: null, avgDays: { $avg: "$subscriptionDays" } } }
+    ]);
+    const avgSubscription = avgSubscriptionDays.length > 0 ? (avgSubscriptionDays[0].avgDays / 30).toFixed(1) : 0;
+
+    // Monthly Revenue (sum of completed paymentHistory amounts in the last 30 days)
+    const now = new Date();
+    const lastMonth = new Date(now);
+    lastMonth.setDate(now.getDate() - 30);
+    const monthlyRevenueSubs = await Subscription.find({
+      paymentStatus: 'completed',
+      'paymentHistory.processedAt': { $gte: lastMonth }
+    });
+    let monthlyRevenue = 0;
+    monthlyRevenueSubs.forEach(sub => {
+      if (Array.isArray(sub.paymentHistory)) {
+        monthlyRevenue += sub.paymentHistory
+          .filter(p => p.status === 'completed' && p.processedAt >= lastMonth)
+          .reduce((sum, p) => sum + (p.amount || 0), 0);
+      }
+    });
+
+    // Recent Subscribers (last 4 subscriptions by startDate)
+    const recentSubscribers = await Subscription.find()
+      .sort({ startDate: -1 })
+      .limit(4)
+      .select('productName startDate status email');
+
+    // Format for frontend
+    const recent = recentSubscribers.map(sub => ({
+      name: sub.email, // You can join with user collection for real name if needed
+      plan: sub.productName,
+      startDate: sub.startDate?.toISOString().slice(0, 10),
+      status: sub.status
+    }));
+
+    res.json({
+      totalSubscribers,
+      activePlans: activePlans.length,
+      avgSubscription,
+      monthlyRevenue,
+      recentSubscribers: recent
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// API for Product Dashboard Data
+const getProductDashboardData = async (req, res) => {
+  try {
+    // Get all unique products from subscriptions
+    const productsRaw = await Subscription.aggregate([
+      {
+        $group: {
+          _id: "$productId",
+          name: { $first: "$productName" },
+          category: { $first: { $cond: [ { $regexMatch: { input: "$productName", regex: /Add-on/i } }, "Add-on", "Subscription" ] } },
+          price: { $first: "$paymentHistory.amount" }, // fallback, may need adjustment
+          status: { $first: "$status" },
+          sales: { $sum: 1 },
+          lastUpdated: { $max: "$startDate" }
+        }
+      }
+    ]);
+
+    // Calculate stats
+    const totalProducts = productsRaw.length;
+    const activeProducts = productsRaw.filter(p => p.status === 'active').length;
+    const totalSales = productsRaw.reduce((sum, p) => sum + (p.sales || 0), 0);
+    // Revenue: sum of all completed paymentHistory amounts for these products
+    const allSubs = await Subscription.find({});
+    let revenue = 0;
+    allSubs.forEach(sub => {
+      if (Array.isArray(sub.paymentHistory)) {
+        revenue += sub.paymentHistory
+          .filter(p => p.status === 'completed')
+          .reduce((sum, p) => sum + (p.amount || 0), 0);
+      }
+    });
+
+    // Format product list for frontend
+    const products = productsRaw.map((p, idx) => ({
+      id: p._id || `PRD${(idx+1).toString().padStart(3, '0')}`,
+      name: p.name,
+      category: p.category,
+      price: p.price || 0,
+      status: p.status,
+      sales: p.sales,
+      lastUpdated: p.lastUpdated ? p.lastUpdated.toISOString().slice(0,10) : ''
+    }));
+
+    res.json({
+      totalProducts,
+      activeProducts,
+      totalSales,
+      revenue,
+      products
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+const getAccountsDashboardData = async (req, res) => {
+  try {
+    // Get all subscriptions with payment history
+    const subscriptions = await Subscription.find({
+      'paymentHistory.0': { $exists: true }
+    });
+
+    // Calculate account statistics
+    const totalBalance = subscriptions.reduce((sum, sub) => {
+      const latestPayment = sub.paymentHistory[sub.paymentHistory.length - 1];
+      return sum + (latestPayment?.amount || 0);
+    }, 0);
+
+    const monthlyRevenue = subscriptions.reduce((sum, sub) => {
+      const thisMonth = new Date().getMonth();
+      const thisYear = new Date().getFullYear();
+      const monthlyPayments = sub.paymentHistory.filter(payment => {
+        const paymentDate = new Date(payment.processedAt);
+        return paymentDate.getMonth() === thisMonth && 
+               paymentDate.getFullYear() === thisYear &&
+               payment.status === 'completed';
+      });
+      return sum + monthlyPayments.reduce((s, p) => s + (p.amount || 0), 0);
+    }, 0);
+
+    const pendingPayments = subscriptions.reduce((sum, sub) => {
+      const pendingAmount = sub.paymentHistory
+        .filter(p => p.status === 'pending')
+        .reduce((s, p) => s + (p.amount || 0), 0);
+      return sum + pendingAmount;
+    }, 0);
+
+    const overdueAmount = subscriptions.reduce((sum, sub) => {
+      const overdueAmount = sub.paymentHistory
+        .filter(p => p.status === 'failed')
+        .reduce((s, p) => s + (p.amount || 0), 0);
+      return sum + overdueAmount;
+    }, 0);
+
+    // Get payment methods
+    const paymentMethods = await Subscription.aggregate([
+      { $unwind: '$paymentHistory' },
+      {
+        $group: {
+          _id: {
+            method: '$paymentHistory.paymentMethod',
+            status: '$paymentHistory.status'
+          },
+          count: { $sum: 1 },
+          total: { $sum: '$paymentHistory.amount' }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.method',
+          details: {
+            $push: {
+              status: '$_id.status',
+              count: '$count',
+              total: '$total'
+            }
+          }
+        }
+      }
+    ]);
+
+    // Get recent transactions
+    const recentTransactions = await Subscription.aggregate([
+      { $unwind: '$paymentHistory' },
+      { $sort: { 'paymentHistory.processedAt': -1 } },
+      { $limit: 10 },
+      {
+        $project: {
+          id: '$paymentHistory.orderId',
+          date: '$paymentHistory.processedAt',
+          description: '$productName',
+          amount: '$paymentHistory.amount',
+          status: '$paymentHistory.status',
+          type: {
+            $cond: {
+              if: { $eq: ['$paymentHistory.status', 'completed'] },
+              then: 'credit',
+              else: 'debit'
+            }
+          }
+        }
+      }
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        accountStats: [
+          {
+            title: 'Total Balance',
+            value: totalBalance.toFixed(2),
+            trend: 'up',
+            percentage: '12.5%'
+          },
+          {
+            title: 'Monthly Revenue',
+            value: monthlyRevenue.toFixed(2),
+            trend: 'up',
+            percentage: '8.2%'
+          },
+          {
+            title: 'Pending Payments',
+            value: pendingPayments.toFixed(2),
+            trend: 'down',
+            percentage: '3.1%'
+          },
+          {
+            title: 'Overdue Amount',
+            value: overdueAmount.toFixed(2),
+            trend: 'up',
+            percentage: '1.2%'
+          }
+        ],
+        paymentMethods: paymentMethods.map(method => ({
+          type: method._id || 'Unknown',
+          number: '****', // For security, we don't store full card numbers
+          expiry: 'N/A',
+          isDefault: method._id === 'Manual'
+        })),
+        recentTransactions
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching accounts dashboard data:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
 module.exports={
-    verifyPayment,transaction,storeOrderData,productBySku,addToCart
+    verifyPayment,transaction,storeOrderData,productBySku,addToCart,
+    getDashboardSummary,
+    getSubscriptionDashboardData,
+    getProductDashboardData,
+    getAccountsDashboardData
 }
 
 

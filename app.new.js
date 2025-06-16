@@ -491,56 +491,119 @@ app.get("/api/product/:sku", async (req, res) => {
     }
 });
 
-app.post("/store-order-data", async(req, res) => {
-    try {
-        const fetch = (await import('node-fetch')).default;
-        const url = `https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${req.body.orderId}`;
+// app.post("/store-order-data", async(req, res) => {
+//     try {
+//       console.log("ashish req body data -------------------------",req.body)
+//         console.log("=== RECEIVED SESSION STORAGE DATA ===");
+//         console.log("Order ID:", req.body.orderId);
+//         console.log("Timestamp:", req.body.timestamp);
+//         console.log("Total sessionStorage items:", req.body.sessionStorageData ? req.body.sessionStorageData.length : 0);
         
-        const options = {
-            method: 'GET',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-                'X-Auth-Token': accessToken
-            }
-        };
+//         // Log the complete request body with proper JSON formatting
+//         console.log("\n📦 COMPLETE REQUEST BODY:");
+//         console.log(JSON.stringify(req.body, null, 2));
+        
+//         // Log all sessionStorage data with detailed formatting
+//         if (req.body.sessionStorageData && req.body.sessionStorageData.length > 0) {
+//             console.log("\n📦 DETAILED SESSION STORAGE DATA:");
+//             req.body.sessionStorageData.forEach((item, index) => {
+//                 console.log(`\n=== ITEM ${index + 1} ===`);
+//                 console.log(`Key: ${item.key}`);
+//                 console.log(`Value Type: ${typeof item.value}`);
+//                 console.log(`Value Content:`);
+//                 console.log(JSON.stringify(item.value, null, 2));
+                
+//                 // If it's a dropdown item, extract specific fields
+//                 if (item.key.startsWith('dropdown_') && item.value) {
+//                     console.log(`\n🎯 DROPDOWN DETAILS:`);
+//                     console.log(`  Product Name: ${item.value.productName || 'N/A'}`);
+//                     console.log(`  SKU: ${item.value.sku || 'N/A'}`);
+//                     console.log(`  Price: ${item.value.price || 'N/A'}`);
+//                     console.log(`  Selected Option: ${JSON.stringify(item.value.selectedOption, null, 2)}`);
+//                 }
+//                 console.log(`==================`);
+//             });
+//         }
 
-        const response = await fetch(url, options);
-        const orderData = await response.json();
-        console.log("orderData",orderData)
-        // Extract subscription days from selectedOption
-        const subscriptionDays = parseInt(req.body?.dropdownData?.selectedOption?.label?.match(/\d+/)[0]);
-        // Create subscription
-        const subscription = new Subscription({
-            orderId: req.body.orderId,
-            userId: orderData.customer_id,
-            email: orderData.billing_address.email,
-            productId: req.body.dropdownData.sku,
-            productName: req.body.dropdownData.productName,
-            subscriptionDays: subscriptionDays,
-            startDate: new Date(),
-            nextShipmentDate: new Date(new Date().setDate(new Date().getDate() + subscriptionDays)),
-            status: 'pending',
-            paymentStatus: 'pending'
-        });
+//         // Process dropdown data if exists
+//         const dropdownItems = req.body.sessionStorageData ? 
+//             req.body.sessionStorageData.filter(item => item.key.startsWith('dropdown_')) : [];
+        
+//         if (dropdownItems.length > 0) {
+//             console.log(`\n🎯 Found ${dropdownItems.length} dropdown items:`);
+            
+//             // Get order data from BigCommerce
+//             const fetch = (await import('node-fetch')).default;
+//             const url = `https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${req.body.orderId}`;
+            
+//             const options = {
+//                 method: 'GET',
+//                 headers: {
+//                     Accept: 'application/json',
+//                     'Content-Type': 'application/json',
+//                     'X-Auth-Token': accessToken
+//                 }
+//             };
 
-        await subscription.save();
+//             const response = await fetch(url, options);
+//             const orderData = await response.json();
+//             console.log("BigCommerce Order Data:", JSON.stringify(orderData, null, 2));
+            
+//             // Process each dropdown item for subscription
+//             for (const dropdownItem of dropdownItems) {
+//                 const dropdownData = dropdownItem.value;
+                
+//                 if (dropdownData.selectedOption && dropdownData.selectedOption.label) {
+//                     const subscriptionDays = parseInt(dropdownData.selectedOption.label.match(/\d+/)?.[0]);
+                    
+//                     if (subscriptionDays) {
+//                         console.log(`Creating subscription for ${dropdownData.productName} with ${subscriptionDays} days`);
+                        
+//                         const subscription = new Subscription({
+//                             orderId: req.body.orderId,
+//                             userId: orderData.customer_id,
+//                             email: orderData.billing_address.email,
+//                             productId: dropdownData.sku,
+//                             productName: dropdownData.productName,
+//                             subscriptionDays: subscriptionDays,
+//                             startDate: new Date(),
+//                             nextShipmentDate: new Date(new Date().setDate(new Date().getDate() + subscriptionDays)),
+//                             status: 'pending',
+//                             paymentStatus: 'pending'
+//                         });
 
-        return res.json({
-            message: "Order and subscription data stored successfully",
-            data: {
-                order: orderData,
-                subscription: subscription
-            }
-        });
-    } catch (err) {
-        console.error("Error:", err);
-        return res.status(500).json({
-            message: "Error processing order data",
-            error: err.message
-        });
-    }
-});
+//                         await subscription.save();
+//                         console.log(`✅ Subscription created for ${dropdownData.productName}`);
+//                     }
+//                 }
+//             }
+//         }
+
+//         return res.json({
+//             success: true,
+//             message: "All sessionStorage data received and processed successfully",
+//             data: {
+//                 orderId: req.body.orderId,
+//                 totalItems: req.body.sessionStorageData ? req.body.sessionStorageData.length : 0,
+//                 dropdownItems: dropdownItems.length,
+//                 receivedData: req.body.sessionStorageData.map(item => ({
+//                     key: item.key,
+//                     hasValue: !!item.value,
+//                     valueType: typeof item.value,
+//                     productName: item.value?.productName || 'N/A',
+//                     sku: item.value?.sku || 'N/A'
+//                 }))
+//             }
+//         });
+//     } catch (err) {
+//         console.error("❌ Error processing sessionStorage data:", err);
+//         return res.status(500).json({
+//             success: false,
+//             message: "Error processing sessionStorage data",
+//             error: err.message
+//         });
+//     }
+// });
 
 // Schedule check for upcoming shipments every minute
 cron.schedule('* * * * *', async () => {
