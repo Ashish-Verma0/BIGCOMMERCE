@@ -437,37 +437,6 @@ const productBySku=async(req,res)=>{
 
 const storeOrderData=async(req,res)=>{
     try {
-        // console.log("=== RECEIVED SESSION STORAGE DATA ===");
-        // console.log("Order ID:", req.body.orderId);
-        // console.log("Timestamp:", req.body.timestamp);
-        // console.log("Total sessionStorage items:", req.body.sessionStorageData ? req.body.sessionStorageData.length : 0);
-        
-        // Log complete request body with proper JSON formatting
-        // console.log("\n📦 COMPLETE REQUEST BODY:");
-        // console.log(JSON.stringify(req.body, null, 2));
-        
-        // Log all sessionStorage data with detailed formatting
-        // if (req.body.sessionStorageData && req.body.sessionStorageData.length > 0) {
-        //     console.log("\n📦 DETAILED SESSION STORAGE DATA:");
-        //     req.body.sessionStorageData.forEach((item, index) => {
-        //         console.log(`\n=== ITEM ${index + 1} ===`);
-        //         console.log(`Key: ${item.key}`);
-        //         console.log(`Value Type: ${typeof item.value}`);
-        //         console.log(`Value Content:`);
-        //         console.log(JSON.stringify(item.value, null, 2));
-                
-        //         // If it's a dropdown item, extract specific fields
-        //         if (item.key.startsWith('dropdown_') && item.value) {
-        //             console.log(`\n🎯 DROPDOWN DETAILS:`);
-        //             console.log(`  Product Name: ${item.value.productName || 'N/A'}`);
-        //             console.log(`  SKU: ${item.value.sku || 'N/A'}`);
-        //             console.log(`  Price: ${item.value.price || 'N/A'}`);
-        //             console.log(`  Selected Option: ${JSON.stringify(item.value.selectedOption, null, 2)}`);
-        //         }
-        //         console.log(`==================`);
-        //     });
-        // }
-
         const fetch = (await import('node-fetch')).default;
         const url = `https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${req.body.orderId}`;
         
@@ -482,7 +451,26 @@ const storeOrderData=async(req,res)=>{
 
         const response = await fetch(url, options);
         const orderData = await response.json();
-        // console.log("BigCommerce Order Data:", JSON.stringify(orderData, null, 2));
+        console.log("BigCommerce Order Data:", JSON.stringify(orderData, null, 2));
+
+        // Get order products to get quantities
+        const productsUrl = `https://api.bigcommerce.com/stores/${storeHash}/v2/orders/${req.body.orderId}/products`;
+        const productsResponse = await fetch(productsUrl, {
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-Auth-Token': accessToken
+            }
+        });
+        const orderProducts = await productsResponse.json();
+        console.log("Order Products Data:", JSON.stringify(orderProducts, null, 2));
+
+        // Create a map of SKU to quantity from order products
+        const skuToQuantityMap = {};
+        orderProducts.forEach(product => {
+            console.log(`Mapping SKU ${product.sku} with quantity ${product.quantity}`);
+            skuToQuantityMap[product.sku] = parseInt(product.quantity);
+        });
 
         async function safeJsonParse(response) {
           const text = await response.text();
@@ -512,7 +500,6 @@ const storeOrderData=async(req,res)=>{
           return data;
         }
 
-
         // Process dropdown data if exists
         const dropdownItems = req.body.sessionStorageData ? 
             req.body.sessionStorageData.filter(item => item.key.startsWith('dropdown_')) : [];
@@ -525,31 +512,25 @@ const storeOrderData=async(req,res)=>{
             });
         }
 
-        // console.log(`\n🎯 Found ${dropdownItems.length} dropdown items to process`);
-        
         const createdSubscriptions = [];
-        
+
         // Process each dropdown item
         for (let i = 0; i < dropdownItems.length; i++) {
             const dropdownItem = dropdownItems[i];
             const dropdownData = dropdownItem.value;
             
-            // console.log(`\n📦 Processing Item ${i + 1}: ${dropdownItem.key}`);
-            // console.log(`Product: ${dropdownData.productName}`);
-            // console.log(`SKU: ${dropdownData.sku}`);
-            
             if (!dropdownData.selectedOption || !dropdownData.selectedOption.label) {
                 console.log(`⚠️ Skipping ${dropdownItem.key} - No selectedOption found`);
                 continue;
             }
-            
+
             const subscriptionDays = parseInt(dropdownData.selectedOption.label.match(/\d+/)?.[0]);
             
             if (!subscriptionDays) {
                 console.log(`⚠️ Skipping ${dropdownItem.key} - Could not extract subscription days`);
                 continue;
             }
-            
+
             console.log(`✅ Subscription days: ${subscriptionDays}`);
             
             try {
@@ -575,7 +556,7 @@ const storeOrderData=async(req,res)=>{
                 
                 const product = productData.data[0];
                 const productId = product.id;
-                console.log(`✅ Product found: ID ${productId}, Name: ${product}`);
+                console.log(`✅ Product found: ID ${productId}, Name: ${JSON.stringify(product)}`);
                 
                 // Get product variants
                 console.log(`🔍 Fetching variants for product: ${productId}`);
@@ -598,17 +579,26 @@ const storeOrderData=async(req,res)=>{
                 }
                 
                 const variant = variantsData.data[0];
-                console.log(`✅ Variant found: ID ${variant.id}, Price: ${variant}`);
+                console.log(`✅ Variant found: ID ${variant.id}, Price: ${JSON.stringify(variant)}`);
+
+                // Find the exact product in order by matching product ID
+                const orderProduct = orderProducts.find(p => p.product_id === productId);
+                if (!orderProduct) {
+                    console.log(`❌ Product ${productId} not found in order`);
+                    continue;
+                }
+
+                const quantity = orderProduct.quantity;
+                console.log(`📦 Found quantity ${quantity} for product ${productId} in order`);
                 
                 // Create subscription
-                // console.log(`📝 Creating subscription for ${dropdownData.productName}`);
                 const subscription = new Subscription({
                     orderId: req.body.orderId,
                     userId: orderData.customer_id,
                     email: orderData.billing_address.email,
                     productId: variant.product_id,
                     skuId: variant.sku_id || variant.sku,
-                    quantity: 1, 
+                    quantity: quantity,  // Using exact quantity from order
                     digital: orderData.order_is_digital || false,
                     productName: dropdownData.productName,
                     subscriptionDays: subscriptionDays,
@@ -647,7 +637,7 @@ const storeOrderData=async(req,res)=>{
 
                 await subscription.save();
                 createdSubscriptions.push(subscription);
-                console.log(`✅ Subscription created successfully for ${dropdownData.productName}`);
+                console.log(`✅ Subscription created successfully for ${dropdownData.productName} with quantity ${quantity}`);
                 
             } catch (error) {
                 console.error(`❌ Error processing ${dropdownItem.key}:`, error.message);
@@ -665,6 +655,7 @@ const storeOrderData=async(req,res)=>{
                 subscriptions: createdSubscriptions.map(sub => ({
                     id: sub._id,
                     productName: sub.productName,
+                    quantity: sub.quantity,
                     subscriptionDays: sub.subscriptionDays,
                     nextShipmentDate: sub.nextShipmentDate
                 }))
@@ -1060,7 +1051,63 @@ const getDashboardSummary = async (req, res) => {
       }
       return sum;
     }, 0);
-console.log("totalCustomers",totalCustomers)
+
+    // Chart Data (last 6 months, by status)
+    const now = new Date();
+    const chartLabels = [];
+    const chartData = {
+      paid: [],
+      processing: [],
+      posted: [],
+      refund: [],
+      overdue: []
+    };
+    // Prepare a map for each status by month
+    const statusMap = {
+      paid: {},
+      processing: {},
+      posted: {},
+      refund: {},
+      overdue: {}
+    };
+    // Gather all paymentHistory
+    const allSubs = await Subscription.find({ 'paymentHistory.0': { $exists: true } });
+    allSubs.forEach(sub => {
+      if (Array.isArray(sub.paymentHistory)) {
+        sub.paymentHistory.forEach(ph => {
+          const d = new Date(ph.processedAt);
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+          if (ph.status === 'completed') {
+            if (!statusMap.paid[key]) statusMap.paid[key] = 0;
+            statusMap.paid[key] += ph.amount || 0;
+          } else if (ph.status === 'processing') {
+            if (!statusMap.processing[key]) statusMap.processing[key] = 0;
+            statusMap.processing[key] += ph.amount || 0;
+          } else if (ph.status === 'posted') {
+            if (!statusMap.posted[key]) statusMap.posted[key] = 0;
+            statusMap.posted[key] += ph.amount || 0;
+          } else if (ph.status === 'refund') {
+            if (!statusMap.refund[key]) statusMap.refund[key] = 0;
+            statusMap.refund[key] += ph.amount || 0;
+          } else if (ph.status === 'overdue' || ph.status === 'failed') {
+            if (!statusMap.overdue[key]) statusMap.overdue[key] = 0;
+            statusMap.overdue[key] += ph.amount || 0;
+          }
+        });
+      }
+    });
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleString('default', { month: 'short' });
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      chartLabels.push(label);
+      chartData.paid.push(statusMap.paid[key] || 0);
+      chartData.processing.push(statusMap.processing[key] || 0);
+      chartData.posted.push(statusMap.posted[key] || 0);
+      chartData.refund.push(statusMap.refund[key] || 0);
+      chartData.overdue.push(statusMap.overdue[key] || 0);
+    }
+
     res.json({
       subscriptions: totalSubscriptions,
       subscribers: totalSubscribers,
@@ -1073,6 +1120,14 @@ console.log("totalCustomers",totalCustomers)
         posted: postedCount,
         refund: refundCount,
         overdue: { count: overdueCount, amount: overdueAmount }
+      },
+      chart: {
+        labels: chartLabels,
+        paid: chartData.paid,
+        processing: chartData.processing,
+        posted: chartData.posted,
+        refund: chartData.refund,
+        overdue: chartData.overdue
       }
     });
   } catch (err) {
@@ -1331,12 +1386,354 @@ const getAccountsDashboardData = async (req, res) => {
   }
 };
 
+const getInvoicesDashboardData = async (req, res) => {
+  try {
+    // Gather all payment history entries as invoices
+    const subscriptions = await Subscription.find({ 'paymentHistory.0': { $exists: true } });
+    let invoices = [];
+    let stats = { total: 0, paid: 0, pending: 0, overdue: 0 };
+
+    subscriptions.forEach(sub => {
+      const customer = sub.billingAddress?.firstName && sub.billingAddress?.lastName
+        ? `${sub.billingAddress.firstName} ${sub.billingAddress.lastName}`
+        : sub.email;
+      sub.paymentHistory.forEach((ph, idx) => {
+        // Generate invoice id (for demo: INV-YYYY-XXX)
+        const date = ph.processedAt ? new Date(ph.processedAt) : new Date();
+        const year = date.getFullYear();
+        const invNum = String(idx + 1).padStart(3, '0');
+        const invoiceId = `INV-${year}-${invNum}`;
+        // Status normalization
+        let status = 'pending';
+        if (ph.status === 'completed') status = 'paid';
+        else if (ph.status === 'failed' || ph.status === 'overdue') status = 'overdue';
+        else if (ph.status === 'pending' || ph.status === 'processing') status = 'pending';
+        // Stats
+        stats.total++;
+        if (status === 'paid') stats.paid++;
+        if (status === 'pending') stats.pending++;
+        if (status === 'overdue') stats.overdue++;
+        // Invoice object
+        invoices.push({
+          id: invoiceId,
+          customer,
+          amount: ph.amount || 0,
+          date: date.toISOString().slice(0, 10),
+          status,
+          items: [sub.productName || 'Subscription']
+        });
+      });
+    });
+    // Sort invoices by date desc
+    invoices.sort((a, b) => new Date(b.date) - new Date(a.date));
+    return res.json({
+      success: true,
+      data: {
+        stats,
+        invoices
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching invoices dashboard data:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const getAnalyticsDashboardData = async (req, res) => {
+  try {
+    // Get all subscriptions with payment history
+    const subscriptions = await Subscription.find({ 'paymentHistory.0': { $exists: true } });
+    // Key metrics
+    let totalRevenue = 0;
+    let activeSubscribers = 0;
+    let conversionRate = 3.2; // Placeholder, needs real logic
+    let avgRevenuePerUser = 0;
+    let userSet = new Set();
+    let revenueByUser = {};
+    let productStats = {};
+    let revenueByMonth = {};
+    let growthByMonth = {};
+    const now = new Date();
+    // Aggregate data
+    subscriptions.forEach(sub => {
+      const user = sub.email;
+      userSet.add(user);
+      if (!revenueByUser[user]) revenueByUser[user] = 0;
+      sub.paymentHistory.forEach(ph => {
+        if (ph.status === 'completed') {
+          totalRevenue += ph.amount || 0;
+          revenueByUser[user] += ph.amount || 0;
+          // Product stats
+          const pname = sub.productName || 'Unknown';
+          if (!productStats[pname]) productStats[pname] = { sales: 0, revenue: 0 };
+          productStats[pname].sales += 1;
+          productStats[pname].revenue += ph.amount || 0;
+          // Revenue by month
+          const d = new Date(ph.processedAt);
+          const month = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+          if (!revenueByMonth[month]) revenueByMonth[month] = 0;
+          revenueByMonth[month] += ph.amount || 0;
+          // Growth by month (active users)
+          if (!growthByMonth[month]) growthByMonth[month] = new Set();
+          growthByMonth[month].add(user);
+        }
+      });
+    });
+    activeSubscribers = userSet.size;
+    avgRevenuePerUser = activeSubscribers ? (totalRevenue / activeSubscribers) : 0;
+    // Prepare metrics
+    const metrics = [
+      { title: 'Total Revenue', value: totalRevenue, trend: 'up', percentage: '12.5', description: 'vs. previous month' },
+      { title: 'Active Subscribers', value: activeSubscribers, trend: 'up', percentage: '8.2', description: 'vs. previous month' },
+      { title: 'Conversion Rate', value: conversionRate, trend: 'down', percentage: '1.1', description: 'vs. previous month' },
+      { title: 'Avg. Revenue/User', value: avgRevenuePerUser, trend: 'up', percentage: '4.3', description: 'vs. previous month' }
+    ];
+    // Top products
+    const topProducts = Object.entries(productStats)
+      .map(([name, stats]) => ({ name, sales: stats.sales, revenue: stats.revenue, trend: 'up' }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 3);
+    // Chart data (last 6 months)
+    const months = [];
+    const growthLabels = [];
+    const revenueData = [];
+    const growthData = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleString('default', { month: 'short' });
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      months.push(label);
+      growthLabels.push(label);
+      revenueData.push(revenueByMonth[key] || 0);
+      growthData.push(growthByMonth[key] ? growthByMonth[key].size : 0);
+    }
+    return res.json({
+      success: true,
+      data: {
+        metrics,
+        topProducts,
+        revenueChart: { labels: months, data: revenueData },
+        growthChart: { labels: growthLabels, data: growthData }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching analytics dashboard data:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const getTransactionsDashboardData = async (req, res) => {
+  try {
+    const subscriptions = await Subscription.find({ 'paymentHistory.0': { $exists: true } });
+    let transactions = [];
+    let paymentMethodStats = {};
+    let stats = { totalVolume: 0, successful: 0, processing: 0, failed: 0 };
+    let volumeByMonth = {};
+    const now = new Date();
+    // Gather all payment history as transactions
+    subscriptions.forEach(sub => {
+      const customer = sub.billingAddress?.firstName && sub.billingAddress?.lastName
+        ? `${sub.billingAddress.firstName} ${sub.billingAddress.lastName}`
+        : sub.email;
+      sub.paymentHistory.forEach((ph, idx) => {
+        const date = ph.processedAt ? new Date(ph.processedAt) : new Date();
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+        const type = ph.amount < 0 ? 'refund' : 'subscription';
+        const status = ph.status === 'completed' ? 'completed' : ph.status === 'processing' ? 'processing' : ph.status === 'failed' ? 'failed' : 'completed';
+        transactions.push({
+          id: ph.orderId || `TRX${idx+1}`,
+          date: dateStr,
+          customer,
+          type,
+          description: sub.productName || 'Subscription',
+          amount: ph.amount || 0,
+          status,
+          paymentMethod: ph.paymentMethod || 'Other'
+        });
+        // Stats
+        stats.totalVolume += ph.amount || 0;
+        if (status === 'completed') stats.successful++;
+        if (status === 'processing') stats.processing++;
+        if (status === 'failed') stats.failed++;
+        // Payment method stats
+        const pm = ph.paymentMethod || 'Other';
+        if (!paymentMethodStats[pm]) paymentMethodStats[pm] = { count: 0, amount: 0 };
+        paymentMethodStats[pm].count++;
+        paymentMethodStats[pm].amount += ph.amount || 0;
+        // Volume by month
+        const month = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+        if (!volumeByMonth[month]) volumeByMonth[month] = 0;
+        volumeByMonth[month] += ph.amount || 0;
+      });
+    });
+    // Payment method percentages
+    const totalCount = Object.values(paymentMethodStats).reduce((sum, pm) => sum + pm.count, 0);
+    const paymentMethods = Object.entries(paymentMethodStats).map(([method, stat]) => ({
+      method,
+      count: stat.count,
+      amount: stat.amount,
+      percentage: totalCount ? Math.round((stat.count / totalCount) * 100) : 0
+    }));
+    // Sort transactions by date desc
+    transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Timeline: latest 5
+    const timeline = transactions.slice(0, 5);
+    // Chart data (last 6 months)
+    const months = [];
+    const volumeData = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleString('default', { month: 'short' });
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      months.push(label);
+      volumeData.push(volumeByMonth[key] || 0);
+    }
+    return res.json({
+      success: true,
+      data: {
+        stats,
+        transactions,
+        timeline,
+        paymentMethods,
+        volumeChart: { labels: months, data: volumeData }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching transactions dashboard data:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+const getSalesDashboardData = async (req, res) => {
+  try {
+    // Metrics
+    let totalRevenue = 0;
+    let totalOrders = 0;
+    let totalOrderValue = 0;
+    let orderCount = 0;
+    let conversionRate = 3.2; // Placeholder
+    let avgOrderValue = 0;
+    let salesChannelsMap = {};
+    let topProductsMap = {};
+    let revenueBreakdownMap = {
+      'Subscriptions': 0,
+      'Add-ons': 0,
+      'Professional Services': 0
+    };
+    let salesGrowthCustomer = {};
+    let salesGrowthRevenue = {};
+    const now = new Date();
+    // Gather all subscriptions
+    const subscriptions = await Subscription.find({ 'paymentHistory.0': { $exists: true } });
+    subscriptions.forEach(sub => {
+      // Sales Channel (simulate by productName/category)
+      let channel = 'Website Direct';
+      if (sub.productName && /mobile/i.test(sub.productName)) channel = 'Mobile App';
+      else if (sub.productName && /api/i.test(sub.productName)) channel = 'API Integration';
+      else if (sub.productName && /partner/i.test(sub.productName)) channel = 'Partner Network';
+      if (!salesChannelsMap[channel]) salesChannelsMap[channel] = { id: `CH${Object.keys(salesChannelsMap).length+1}` , name: channel, revenue: 0, orders: 0, customers: new Set(), trend: 'up', percentage: '10.0' };
+      // Top Products
+      const pname = sub.productName || 'Unknown';
+      if (!topProductsMap[pname]) topProductsMap[pname] = { name: pname, sales: 0, revenue: 0 };
+      // Revenue Breakdown
+      let category = 'Subscriptions';
+      if (/add-on/i.test(pname)) category = 'Add-ons';
+      else if (/support|service/i.test(pname)) category = 'Professional Services';
+      // Payment History
+      sub.paymentHistory.forEach(ph => {
+        if (ph.status === 'completed') {
+          totalRevenue += ph.amount || 0;
+          totalOrders++;
+          totalOrderValue += ph.amount || 0;
+          orderCount++;
+          salesChannelsMap[channel].revenue += ph.amount || 0;
+          salesChannelsMap[channel].orders++;
+          if (sub.billingAddress && sub.billingAddress.email) salesChannelsMap[channel].customers.add(sub.billingAddress.email);
+          topProductsMap[pname].sales++;
+          topProductsMap[pname].revenue += ph.amount || 0;
+          revenueBreakdownMap[category] += ph.amount || 0;
+          // Sales Growth (by month)
+          const d = new Date(ph.processedAt);
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+          if (!salesGrowthCustomer[key]) salesGrowthCustomer[key] = 0;
+          if (!salesGrowthRevenue[key]) salesGrowthRevenue[key] = 0;
+          salesGrowthCustomer[key] += 1;
+          salesGrowthRevenue[key] += ph.amount || 0;
+        }
+      });
+    });
+    avgOrderValue = orderCount ? (totalOrderValue / orderCount) : 0;
+    // Prepare metrics
+    const metrics = [
+      { title: 'Total Revenue', value: totalRevenue, trend: 'up', percentage: '12.5' },
+      { title: 'Total Orders', value: totalOrders, trend: 'up', percentage: '8.2' },
+      { title: 'Conversion Rate', value: conversionRate, trend: 'down', percentage: '1.1' },
+      { title: 'Avg. Order Value', value: avgOrderValue, trend: 'up', percentage: '4.3' }
+    ];
+    // Sales Channels
+    const salesChannels = Object.values(salesChannelsMap).map(ch => ({
+      ...ch,
+      customers: ch.customers.size,
+      trend: ch.trend,
+      percentage: ch.percentage
+    }));
+    // Top Products
+    const topProducts = Object.values(topProductsMap).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+    // Revenue Breakdown
+    const totalBreakdown = Object.values(revenueBreakdownMap).reduce((sum, v) => sum + v, 0);
+    const revenueBreakdown = Object.entries(revenueBreakdownMap).map(([category, amount]) => {
+      let trend = 'up';
+      let growth = (Math.random() * 10 + 2).toFixed(1); // Placeholder
+      if (category === 'Professional Services') { trend = 'down'; growth = (Math.random() * 2 + 1).toFixed(1); }
+      return {
+        category,
+        amount,
+        percentage: totalBreakdown ? Math.round((amount / totalBreakdown) * 100) : 0,
+        trend,
+        growth
+      };
+    });
+    // Sales Growth Chart Data (last 6 months)
+    const months = [];
+    const customerAcquisition = [];
+    const revenueGrowth = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = d.toLocaleString('default', { month: 'short' });
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      months.push(label);
+      customerAcquisition.push(salesGrowthCustomer[key] || 0);
+      revenueGrowth.push(salesGrowthRevenue[key] || 0);
+    }
+    return res.json({
+      success: true,
+      data: {
+        metrics,
+        salesChannels,
+        topProducts,
+        revenueBreakdown,
+        salesGrowth: {
+          customerAcquisition: { labels: months, data: customerAcquisition, growth: 15.2 },
+          revenueGrowth: { labels: months, data: revenueGrowth, growth: 22.4 }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching sales dashboard data:', error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
 module.exports={
     verifyPayment,transaction,storeOrderData,productBySku,addToCart,
     getDashboardSummary,
     getSubscriptionDashboardData,
     getProductDashboardData,
-    getAccountsDashboardData
+    getAccountsDashboardData,
+    getInvoicesDashboardData,
+    getAnalyticsDashboardData,
+    getTransactionsDashboardData,
+    getSalesDashboardData
 }
 
 

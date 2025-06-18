@@ -1,6 +1,6 @@
 const express=require('express')
 const subscriptionRouter=express.Router()
-const {verifyPayment, transaction, storeOrderData, productBySku, addToCart, getDashboardSummary, getSubscriptionDashboardData, getProductDashboardData, getAccountsDashboardData}=require('../controller/subscription.controller')
+const {verifyPayment, transaction, storeOrderData, productBySku, addToCart, getDashboardSummary, getSubscriptionDashboardData, getProductDashboardData, getAccountsDashboardData, getInvoicesDashboardData, getAnalyticsDashboardData, getTransactionsDashboardData, getSalesDashboardData}=require('../controller/subscription.controller')
 
 
 subscriptionRouter.get('/api/verify-payment/:orderId',verifyPayment)
@@ -20,5 +20,13 @@ subscriptionRouter.get('/dashboard/subscription-stats', getSubscriptionDashboard
 subscriptionRouter.get('/dashboard/product-stats', getProductDashboardData)
 
 subscriptionRouter.get('/api/accounts/dashboard', getAccountsDashboardData)
+
+subscriptionRouter.get('/api/invoices/dashboard', getInvoicesDashboardData)
+
+subscriptionRouter.get('/api/analytics/dashboard', getAnalyticsDashboardData)
+
+subscriptionRouter.get('/api/transactions/dashboard', getTransactionsDashboardData)
+
+subscriptionRouter.get('/api/sales/dashboard', getSalesDashboardData)
 
 module.exports=subscriptionRouter
